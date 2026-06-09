@@ -21,13 +21,40 @@ function renderMessage(content: string) {
 }
 
 export function AISecretaryPage() {
-  const { user } = useAuth()
-  const { messages, isTyping, input, setInput, sendMessage, handleKeyDown, bottomRef } = useChat()
+  const { user, token } = useAuth()
+  const {
+    messages,
+    isTyping,
+    isRecording,
+    isTranscribing,
+    input,
+    setInput,
+    sendMessage,
+    startRecording,
+    stopRecording,
+    handleKeyDown,
+    bottomRef,
+  } = useChat({ user, authToken: token })
   const textareaRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording()
+      return
+    }
+
+    void startRecording()
+  }
+
+  const audioStatus = isRecording
+    ? 'Gravando áudio... clique no botão vermelho para parar.'
+    : isTranscribing
+      ? 'Transcrevendo áudio com Whisper...'
+      : null
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -143,7 +170,7 @@ export function AISecretaryPage() {
           ))}
 
           {/* Typing indicator */}
-          {isTyping && (
+          {(isTyping || isTranscribing) && (
             <div className="flex items-end gap-3 max-w-[70%] self-start animate-fade-in">
               <div className="w-8 h-8 rounded-full bg-primary-container border border-outline-variant flex items-center justify-center shrink-0">
                 <span
@@ -175,10 +202,10 @@ export function AISecretaryPage() {
             {/* Quick suggestion chips */}
             <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar pb-1">
               {[
-                'Solicitar histórico',
-                'Ver minhas notas',
-                'Prazo de matrícula',
-                'Contato da secretaria',
+                'Transferir horário',
+                'Trancar matrícula',
+                'Calendário acadêmico',
+                'Ver disciplinas e professores',
               ].map((suggestion) => (
                 <button
                   key={suggestion}
@@ -193,6 +220,13 @@ export function AISecretaryPage() {
               ))}
             </div>
 
+            {audioStatus && (
+              <div className="mb-2 flex items-center justify-center gap-2 font-inter text-[12px] text-primary animate-fade-in">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                {audioStatus}
+              </div>
+            )}
+
             {/* Input bar */}
             <div className="flex items-center gap-3 bg-surface-container-low rounded-full px-3 py-2 border border-outline-variant/40 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/30 transition-all">
               <button className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors shrink-0">
@@ -205,17 +239,31 @@ export function AISecretaryPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem para a secretaria..."
-                className="flex-1 bg-transparent border-none focus:ring-0 font-inter text-[15px] text-on-surface placeholder:text-on-surface-variant/60 py-2 outline-none"
+                disabled={isTranscribing}
+                placeholder={isTranscribing ? 'Transcrevendo áudio...' : 'Digite sua mensagem para a secretaria...'}
+                className="flex-1 bg-transparent border-none focus:ring-0 font-inter text-[15px] text-on-surface placeholder:text-on-surface-variant/60 py-2 outline-none disabled:cursor-wait"
               />
 
               <div className="flex items-center gap-1 shrink-0">
-                <button className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">mic</span>
+                <button
+                  onClick={handleMicClick}
+                  disabled={isTyping || isTranscribing}
+                  title={isRecording ? 'Parar gravação' : 'Gravar áudio'}
+                  className={cn(
+                    'w-9 h-9 rounded-full flex items-center justify-center transition-colors',
+                    isRecording
+                      ? 'bg-error text-on-error hover:bg-error'
+                      : 'text-on-surface-variant hover:bg-surface-container-high hover:text-primary',
+                    (isTyping || isTranscribing) && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {isTranscribing ? 'hourglass_top' : isRecording ? 'stop' : 'mic'}
+                  </span>
                 </button>
                 <button
-                  onClick={sendMessage}
-                  disabled={!input.trim() || isTyping}
+                  onClick={() => void sendMessage()}
+                  disabled={!input.trim() || isTyping || isTranscribing}
                   className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary hover:bg-[#6a000e] transition-all shadow-primary-glow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span
